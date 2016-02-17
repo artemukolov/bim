@@ -7,6 +7,7 @@
         keys: {},
         valueble_nodes: ['INPUT'],
         templates: {},
+        sandboxes: {},
         generate_key: function () {
             var letters = 'AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz1234567890';
             var result = '';
@@ -25,10 +26,14 @@
             if (typeof (node.attr("b_set")) != 'undefined'){
                 eval(node.attr("b_set"));
             }
-            if (bim.is_valueble(node)){
-                node.val(val);
+            if (typeof (node.attr("b_set_attr")) != 'undefined'){
+                node.attr(node.attr("b_set_attr"), val);
             } else {
-                node.html(val);
+                if (bim.is_valueble(node)){
+                    node.val(val);
+                } else {
+                    node.html(val);
+                }
             }
         },
         get_object: function (object_str) {
@@ -64,13 +69,14 @@
             index = index || false;
             var t = template.clone();
 
-            var object = bim.get_object(template.attr("bim_id"));
+            var bim_object = o;//bim.get_object(template.attr("bim_id"));
+
             if (index) {
-                object = object[index];
+                bim_object = bim_object[index];
             }
 
             for (j in o){
-                var node = $(t).find("[bim_field="+j+"]");
+
                 var key = bim.generate_key();
                 bim.keys[key] = {
                     object: template.attr("bim_id"),
@@ -78,19 +84,29 @@
                     index: index
                 };
 
-                node.attr("bim_key", key);
-                bim.set_page_value(node, o[j]);
-                if (bim.is_valueble(node)){
-                    node.on("change", function(){
-                        bim.change_object($(this).attr("bim_key"), $(this).val());
-                    });
-                }
+
+                $(t).find("[bim_field="+j+"]").each(function (indx, node1) {
+
+                    var node = $(this);
+                    node.attr("bim_key", key);
+                    bim.set_page_value(node, o[j]);
+                    if (bim.is_valueble(node)){
+                        node.on("change", function(){
+                            bim.change_object($(this).attr("bim_key"), $(this).val());
+                        });
+                    }
+                    
+                });;
+                
             }
-            watch(object, function(prop, action, newvalue, oldvalue){
+            watch(bim_object, function(prop, action, newvalue, oldvalue){
                 bim.change_dom(template.attr("bim_id"), prop, index, newvalue);
             });
-
-            sandbox.append(t);
+            if (typeof (template.attr('bim_array')) != 'undefined'){
+                sandbox.prepend(t);
+            } else {
+                sandbox.append(t);
+            }
         },
         destroy_keys: function (object_str) {
             for(i in bim.keys){
@@ -100,27 +116,33 @@
             }
         },
         unwach_object: function (object_str) {
-            var o = bim.get_object(object_str);
-            unwatch(o, function () {
-
-            });
+            unwatch(bim.get_object(object_str), function () {});
         },
-        bunch_object: function(Object_id){
-            var bim_object = bim.get_object(Object_id);
+        bunch_object: function(Object_id, bim_object){
+
+            var bim_object = bim_object || bim.get_object(Object_id);
             if ((typeof bim_object) !== "undefined"){
+
                 if (typeof (bim.templates[Object_id]) == "undefined"){
                     bim.templates[Object_id] = $("[bim_id='" + Object_id + "']").clone();
                 }
+                if (typeof (bim.sandboxes[Object_id]) == "undefined"){
+                    bim.sandboxes[Object_id] = $("[bim_id='" + Object_id + "']").parent();
+                }
                 var template = bim.templates[Object_id];
-                var sandbox = $("[bim_id='" + Object_id + "']").parent();
+                var sandbox =  bim.sandboxes[Object_id];
                 $("[bim_id='" + Object_id + "']").remove();
                 if (typeof (template.attr('bim_array')) != 'undefined'){
+
                     for (i in bim_object){
                         //template.attr("bim_index", i);
+                      //  console.log(bim_object[i]);
                         bim.bind(template, bim_object[i], sandbox, i);
                     }
                     watch(bim_object, function (prop, action, newvalue, oldvalue) {
+
                         if ((action  == "splice") || (action  == "push")){
+                      //      console.log(prop, action, newvalue, oldvalue);
                             bim.destroy_keys(Object_id);
                             bim.unwach_object(Object_id);
                             bim.bunch_object(Object_id);
@@ -131,9 +153,16 @@
                 }
             }
         },
-        init: function () {
-            $("[bim_id]").each(function (indx, element) {
-                bim.bunch_object($(this).attr("bim_id"))
-            });
+        init: function (object_str) {
+            object_str = object_str || false;
+            if (object_str == false) {
+                $("[bim_id]").each(function (indx, element) {
+                    bim.bunch_object($(this).attr("bim_id"));
+                });
+            } else {
+                bim.bunch_object(object_str);
+            }
+
+
         }
     };
