@@ -8,6 +8,7 @@
         valueble_nodes: ['INPUT'],
         templates: {},
         sandboxes: {},
+        sort_array: {},
         generate_key: function () {
             var letters = 'AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz1234567890';
             var result = '';
@@ -64,6 +65,7 @@
                 console.log("key "+key+" not found");
             }
         },
+
         bind : function (template, o, sandbox, index) {
 
             index = index || false;
@@ -99,61 +101,162 @@
                 });;
                 
             }
+
             watch(bim_object, function(prop, action, newvalue, oldvalue){
+
                 bim.change_dom(template.attr("bim_id"), prop, index, newvalue);
+
             });
-            if (typeof (template.attr('bim_array')) != 'undefined'){
-                sandbox.prepend(t);
-            } else {
-                sandbox.append(t);
-            }
+
+            sandbox.append(t);
+
         },
-        destroy_keys: function (object_str) {
-            for(i in bim.keys){
-                if (bim.keys[i].object == object_str){
-                    delete(bim.keys[i]);
+
+        bind_array: function(template, bim_object, sandbox){
+
+            var temp_arr = [];
+
+            for (i in bim_object){
+
+                var temp_record = bim_object[i];
+
+                temp_record.bim_temp_index = i;
+
+                temp_arr.push(temp_record);
+
+            }
+
+            if (typeof (bim.sort_array[template.attr('bim_id')]) != 'undefined'){
+
+                var sort = bim.sort_array[template.attr('bim_id')];
+
+                sort_function = function(a, b){
+
+
+                    if (typeof (template.find("[bim_field="+sort.field+"][b_sort_func]").attr('b_sort_func')) != 'undefined'){
+
+                         eval(template.find("[bim_field="+sort.field+"][b_sort_func]").attr('b_sort_func'));
+                    
+                    } 
+
+                    else {
+
+                        val = a[sort.field]>b[sort.field];
+
+                    }
+
+                    if (sort.reverse){
+
+                        val = !val;
+
+                    }
+
+                    return val;
+
                 }
+
+                temp_arr.sort(sort_function);
+
             }
+
+            for (i in temp_arr){
+
+                bim.bind(template, bim_object[temp_arr[i].bim_temp_index], sandbox, temp_arr[i].bim_temp_index);
+
+            }
+
         },
+
+        destroy_keys: function (object_str) {
+
+            for(i in bim.keys){
+
+                if (bim.keys[i].object == object_str){
+
+                    delete(bim.keys[i]);
+
+                }
+
+            }
+
+        },
+
         unwach_object: function (object_str) {
+
             unwatch(bim.get_object(object_str), function () {});
+
         },
+
         bunch_object: function(Object_id, bim_object){
 
             var bim_object = bim_object || bim.get_object(Object_id);
+
             if ((typeof bim_object) !== "undefined"){
 
                 if (typeof (bim.templates[Object_id]) == "undefined"){
+
                     bim.templates[Object_id] = $("[bim_id='" + Object_id + "']").clone();
+
                 }
+
                 if (typeof (bim.sandboxes[Object_id]) == "undefined"){
+
                     bim.sandboxes[Object_id] = $("[bim_id='" + Object_id + "']").parent();
+
                 }
+
                 var template = bim.templates[Object_id];
+
                 var sandbox =  bim.sandboxes[Object_id];
+
                 $("[bim_id='" + Object_id + "']").remove();
+
                 if (typeof (template.attr('bim_array')) != 'undefined'){
 
-                    for (i in bim_object){
-                        //template.attr("bim_index", i);
-                      //  console.log(bim_object[i]);
-                        bim.bind(template, bim_object[i], sandbox, i);
-                    }
+                    bim.bind_array(template, bim_object, sandbox);
+
                     watch(bim_object, function (prop, action, newvalue, oldvalue) {
 
                         if ((action  == "splice") || (action  == "push")){
-                      //      console.log(prop, action, newvalue, oldvalue);
+                      
                             bim.destroy_keys(Object_id);
+                      
                             bim.unwach_object(Object_id);
+                      
                             bim.bunch_object(Object_id);
+                      
                         }
+
                     });
+
                 } else {
+
                     bim.bind(template, bim_object, sandbox);
+
                 }
+
             }
+
         },
+
+        set_sort: function(object_id, field, reverse){
+
+            bim.sort_array[object_id] = {
+                field: field,
+                reverse: reverse || false
+            };
+
+
+        },
+
+        get_sort: function(object_id){
+
+            return bim.sort_array[object_id] || false;
+
+        },
+
         init: function (object_str) {
+
             object_str = object_str || false;
             if (object_str == false) {
                 $("[bim_id]").each(function (indx, element) {
@@ -166,3 +269,4 @@
 
         }
     };
+
